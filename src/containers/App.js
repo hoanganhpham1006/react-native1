@@ -7,46 +7,59 @@
  */
 
 import React, {Component} from 'react';
-import {StyleSheet, View, Text, Button, TextInput, ScrollView} from 'react-native';
-import {Container, Header, Title, Body} from 'native-base';
+import {StyleSheet, View, Text, Button, TextInput, ScrollView, Image, ActivityIndicator} from 'react-native';
+import {Container, Header, Title, Body, Tab, Tabs, ScrollableTab, Icon} from 'native-base';
 import MatchComponent from '../components/Match';
+import { matchesList } from '../models/matchesList';
+import { getMatchesList } from '../models/matchesList';
 
 export default class App extends Component{
   constructor(props) {
     super(props);
 
     this.state = {
-      matches: [
-        {
-          team1: `Brazil`,
-          team2: `Belgium`,
-          time: `1:00`,
-          score1: `1`,
-          score2: `2`,
-          image1: `brazil`,
-          image2: `belgium`,
-        },
-        {
-          team1: `Sweden`,
-          team2: `England`,
-          time: `21:00`,
-          score1: `0`,
-          score2: `2`,
-          image1: `sweden`,
-          image2: `england`,
-        }
-      ],
-      textInputValue: ``
+      matchesList: matchesList.WC2018,
+      loadingText: `LOADING..`
     }
   }
-  deleteMatch1() {
-    const matches = this.state.matches;
-    delete matches[0];
 
-    this.setState({
-      matches //Full? Why can't delete 2 times
-    });
+  componentDidMount() {
+    for (let i = 20180616; i <= 20180621; i++) {
+      if(i == 20180631) i = 20180701;
+      getMatchesList(i + '')
+        .then(allMatch => {
+          let allMatchInfo = [];
+
+          if (allMatch['FIFA World Cup']) {
+            for (wcmatch of allMatch['FIFA World Cup']) {
+              allMatchInfo.push(
+                {
+                  team1: wcmatch.competitors.split(' vs. ')[0],
+                  team2: wcmatch.competitors.split(' vs. ')[1],
+                  time: wcmatch.time,
+                  score1: wcmatch.scores.split('-')[0],
+                  score2: wcmatch.scores.split('-')[1],
+                  image1: `brazil`,
+                  image2: `belgium`,
+                },
+              )
+            }
+            if (i == 20180621) this.setState({loadingText: ''});
+
+            this.state.matchesList.push({
+              date: i + '',
+              matches: allMatchInfo
+            });
+
+            this.state.matchesList = this.state.matchesList.sort((a, b) => a.date > b.date);
+          }
+        })
+        .catch(e => console.log(e));
+        // console.log(i);
+    }
+    // console.log("DONE");
   }
+
   render() {
     return (
       <Container>
@@ -55,40 +68,45 @@ export default class App extends Component{
             <Title>World cup 2018</Title>
           </Body>
         </Header>
-        <ScrollView style={styles.container}>
-          <View>
-            <View style={styles.round}>
-              <Text style={styles.roundText}>QUATER-FINALS</Text>
-            </View>
-            {
-              this.state.matches.map(
-                match => 
-                  <MatchComponent
-                    team1 = {match.team1}
-                    team2 = {match.team2}
-                    score1 = {match.score1}
-                    score2 = {match.score2}
-                    image1 = {match.image1}
-                    image2 = {match.image2}
-                    time = {match.time}
-                    key = {`match_${match.team1}_vs_${match.team2}`}
-                  />
-              )
-            }
+        
+        { this.state.loadingText ?
+          <View style={[styles.container, {flex: 1, justifyContent: 'center'}]}>
+            <Text style={styles.loadingText}>{this.state.loadingText}</Text>
+            <ActivityIndicator size="large" color="gray" />
           </View>
-          <Button
-            title="Delete match 1"
-            style={styles.deleteButton}
-            onPress={() => {this.deleteMatch1();}}
-          />
-          <Text>Texting: {this.state.textInputValue}</Text>
-          <TextInput
-            value={this.state.textInputValue}
-            style={styles.input}
-            onChangeText={(newText) => {this.setState({textInputValue: newText});}}
-          />
-
-        </ScrollView>
+          :
+          <ScrollView style={styles.container}>
+            <Tabs 
+              renderTabBar={() => <ScrollableTab/>} 
+            >
+              {this.state.matchesList.map(
+                matchDay =>
+                <Tab heading={matchDay.date} style={styles.container} tabStyle={styles.tabHeading} activeTabStyle={styles.tabHeading} key={`match_day_${matchDay.date}`}>
+                  <View>
+                    <View style={styles.round}>
+                      <Text style={styles.roundText}>QUATER-FINALS</Text>
+                    </View>
+                    {
+                      matchDay.matches.map(
+                        match => 
+                          <MatchComponent
+                            team1 = {match.team1}
+                            team2 = {match.team2}
+                            score1 = {match.score1}
+                            score2 = {match.score2}
+                            image1 = {match.image1}
+                            image2 = {match.image2}
+                            time = {match.time}
+                            key = {`match_${match.team1}_vs_${match.team2}`}
+                          />
+                      )
+                    }
+                  </View>
+                </Tab>
+              )}
+            </Tabs>
+          </ScrollView> 
+        }
       </Container>
     );
   }
@@ -96,7 +114,8 @@ export default class App extends Component{
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#edf1f7'
+    backgroundColor: '#edf1f7',
+    flex: 1
   },
   round: {
     marginTop: 10,
@@ -115,5 +134,13 @@ const styles = StyleSheet.create({
     width: 500,
     height: 50,
     backgroundColor: 'white'
+  },
+  tabHeading: {
+    width: 150,
+  },
+  loadingText: {
+    fontSize: 20,
+    color: 'gray',
+    textAlign: 'center'
   }
 });
